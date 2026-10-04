@@ -1,3 +1,4 @@
+import android.widget.AbsListView;
 package launcher.minimalist.com;
 
 import android.app.Activity;
@@ -8,13 +9,16 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
+import android.widget.ImageView;
 import android.widget.ListView;
 
 import java.util.ArrayList;
@@ -25,10 +29,10 @@ public class MainActivity extends Activity {
 
     private PackageManager packageManager;
     private ArrayList<String> packageNames;
-    private ArrayAdapter<String> adapter;
+    private ArrayList<Drawable> appIcons;
+    private IconAdapter adapter;
     private ListView listView;
 
-    // Apps can be installed or removed while the launcher sits in the background
     private final BroadcastReceiver packageChangeReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -40,55 +44,65 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Setup UI elements
         listView = new ListView(this);
         listView.setVerticalScrollBarEnabled(false);
-        listView.setId(android.R.id.list);
         listView.setDivider(null);
+        listView.setBackgroundColor(Color.WHITE);
+
         setContentView(listView);
-        ViewGroup.MarginLayoutParams p = (ViewGroup.MarginLayoutParams) listView.getLayoutParams();
+
+        ViewGroup.MarginLayoutParams p =
+                (ViewGroup.MarginLayoutParams) listView.getLayoutParams();
+
         p.setMargins(100, 0, 0, 0);
 
-        // Get a list of all the apps installed
         packageManager = getPackageManager();
-        adapter = new ArrayAdapter<String>(
-                this, android.R.layout.simple_list_item_1, new ArrayList<String>());
+
         packageNames = new ArrayList<>();
+        appIcons = new ArrayList<>();
 
-        // Tap on an item in the list to launch the app
-        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                try {
-                    startActivity(packageManager.getLaunchIntentForPackage(packageNames.get(position)));
-                } catch (Exception e) {
-                    fetchAppList();
-                }
+        adapter = new IconAdapter(this);
+        listView.setAdapter(adapter);
+
+        listView.setOnItemClickListener((parent, view, position, id) -> {
+            try {
+                startActivity(
+                        packageManager.getLaunchIntentForPackage(
+                                packageNames.get(position)
+                        )
+                );
+            } catch (Exception e) {
+                fetchAppList();
             }
         });
 
-        // Long press on an item in the list to open the app settings
-        listView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override
-            public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-                try {
-                    // Attempt to launch the app with the package name
-                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                    intent.setData(Uri.parse("package:" + packageNames.get(position)));
-                    startActivity(intent);
-                } catch (ActivityNotFoundException e) {
-                    fetchAppList();
-                }
-                return false;
+        listView.setOnItemLongClickListener((parent, view, position, id) -> {
+            try {
+                Intent intent =
+                        new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+
+                intent.setData(
+                        Uri.parse("package:" + packageNames.get(position))
+                );
+
+                startActivity(intent);
+
+            } catch (ActivityNotFoundException e) {
+                fetchAppList();
             }
+
+            return true;
         });
-        // Keep the list in sync as apps are installed, removed, or updated
+
         IntentFilter packageFilter = new IntentFilter();
+
         packageFilter.addAction(Intent.ACTION_PACKAGE_ADDED);
         packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
         packageFilter.addAction(Intent.ACTION_PACKAGE_CHANGED);
         packageFilter.addAction(Intent.ACTION_PACKAGE_REPLACED);
+
         packageFilter.addDataScheme("package");
+
         registerReceiver(packageChangeReceiver, packageFilter);
 
         fetchAppList();
@@ -101,32 +115,104 @@ public class MainActivity extends Activity {
     }
 
     private void fetchAppList() {
-        // Start from a clean adapter when refreshing the list
-        adapter.clear();
+
         packageNames.clear();
+        appIcons.clear();
 
-        // Query the package manager for all apps
-        List<ResolveInfo> activities = packageManager.queryIntentActivities(
-                new Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER), 0);
+        List<ResolveInfo> activities =
+                packageManager.queryIntentActivities(
+                        new Intent(Intent.ACTION_MAIN, null)
+                                .addCategory(Intent.CATEGORY_LAUNCHER),
+                        0
+                );
 
-        // Sort the applications by alphabetical order and add them to the list
-        Collections.sort(activities, new ResolveInfo.DisplayNameComparator(packageManager));
+        Collections.sort(
+                activities,
+                new ResolveInfo.DisplayNameComparator(packageManager)
+        );
+
         for (ResolveInfo resolver : activities) {
 
-            // Exclude the settings app and this launcher from the list of apps shown
-            String appName = (String) resolver.loadLabel(packageManager);
-            if (appName.equals("Settings") || appName.equals("Minimalist Launcher"))
-                continue;
+            String appName =
+                    (String) resolver.loadLabel(packageManager);
 
-            adapter.add(appName);
-            packageNames.add(resolver.activityInfo.packageName);
+            if (appName.equals("Settings")
+                    || appName.equals("Minimalist Launcher")) {
+                continue;
+            }
+
+            packageNames.add(
+                    resolver.activityInfo.packageName
+            );
+
+            appIcons.add(
+                    resolver.loadIcon(packageManager)
+            );
         }
-        listView.setAdapter(adapter);
+
+        adapter.notifyDataSetChanged();
     }
 
-    @Override
-    public void onBackPressed() {
-        // Prevent the back button from closing the activity.
-        fetchAppList();
+    private class IconAdapter extends BaseAdapter {
+
+        private final Context context;
+
+        IconAdapter(Context context) {
+            this.context = context;
+        }
+
+        @Override
+        public int getCount() {
+            return appIcons.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return appIcons.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(
+                int position,
+                View convertView,
+                ViewGroup parent) {
+
+            ImageView icon;
+
+            if (convertView == null) {
+
+                icon = new ImageView(context);
+
+                int size = 120;
+
+                icon.setLayoutParams(
+                        new AbsListView.LayoutParams(
+                                size,
+                                size
+                        )
+                );
+
+                icon.setPadding(20, 20, 20, 20);
+                icon.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+
+                icon.setGravity(Gravity.CENTER);
+
+            } else {
+
+                icon = (ImageView) convertView;
+            }
+
+            icon.setImageDrawable(
+                    appIcons.get(position)
+            );
+
+            return icon;
+        }
     }
 }
+
