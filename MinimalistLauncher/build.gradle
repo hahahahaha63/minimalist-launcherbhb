@@ -1,6 +1,8 @@
 apply plugin: 'com.android.application'
 
 android {
+    namespace "launcher.minimalist.com"
+
     compileSdkVersion 35
 
     defaultConfig {
