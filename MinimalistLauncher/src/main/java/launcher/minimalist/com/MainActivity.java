@@ -1,83 +1,80 @@
-
 package launcher.minimalist.com;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 public class MainActivity extends Activity {
 
-    private PackageManager packageManager;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        packageManager = getPackageManager();
 
         // Main screen
         LinearLayout mainLayout = new LinearLayout(this);
         mainLayout.setOrientation(LinearLayout.VERTICAL);
         mainLayout.setGravity(Gravity.CENTER);
-        mainLayout.setBackgroundColor(Color.WHITE);
+        mainLayout.setBackgroundColor(0xFFFFFFFF);
 
-        // 2 x 2 grid
-        GridLayout grid = new GridLayout(this);
-        grid.setColumnCount(2);
-        grid.setRowCount(2);
+        // First row
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER);
 
-        // Phone
+        // Second row
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setGravity(Gravity.CENTER);
+
+        // Add the four apps
         addAppIcon(
-                grid,
+                topRow,
                 "phone_icon",
                 "Phone",
-                getPhoneIntent()
+                new Intent(Intent.ACTION_DIAL)
         );
 
-        // Messages
         addAppIcon(
-                grid,
+                topRow,
                 "messages_icon",
                 "Messages",
-                getMessagesIntent()
+                new Intent(Intent.ACTION_MAIN)
+                        .addCategory(Intent.CATEGORY_APP_MESSAGING)
         );
 
-        // Contacts
         addAppIcon(
-                grid,
+                bottomRow,
                 "contacts_icon",
                 "Contacts",
-                getContactsIntent()
+                new Intent(Intent.ACTION_MAIN)
+                        .addCategory(Intent.CATEGORY_APP_CONTACTS)
         );
 
-        // Settings
         addAppIcon(
-                grid,
+                bottomRow,
                 "settings_icon",
                 "Settings",
                 new Intent(Settings.ACTION_SETTINGS)
         );
 
-        mainLayout.addView(grid);
+        // Add rows to screen
+        mainLayout.addView(topRow);
+        mainLayout.addView(bottomRow);
 
         setContentView(mainLayout);
     }
 
     private void addAppIcon(
-            GridLayout grid,
+            LinearLayout row,
             String iconName,
             String appName,
-            Intent intent
+            final Intent intent
     ) {
 
         LinearLayout item = new LinearLayout(this);
@@ -85,16 +82,14 @@ public class MainActivity extends Activity {
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
 
-        int width = 300;
-        int height = 300;
+        LinearLayout.LayoutParams itemParams =
+                new LinearLayout.LayoutParams(
+                        0,
+                        300,
+                        1
+                );
 
-        GridLayout.LayoutParams params =
-                new GridLayout.LayoutParams();
-
-        params.width = width;
-        params.height = height;
-
-        item.setLayoutParams(params);
+        item.setLayoutParams(itemParams);
 
         // Icon
         ImageView icon = new ImageView(this);
@@ -107,14 +102,7 @@ public class MainActivity extends Activity {
                 );
 
         if (resourceId != 0) {
-
             icon.setImageResource(resourceId);
-
-        } else {
-
-            // If custom icon isn't found,
-            // show a simple placeholder.
-            icon.setImageDrawable(null);
         }
 
         icon.setLayoutParams(
@@ -130,58 +118,30 @@ public class MainActivity extends Activity {
 
         item.addView(icon);
 
-        // App name
+        // Name underneath icon
         TextView text = new TextView(this);
 
         text.setText(appName);
         text.setTextSize(18);
-        text.setTextColor(Color.BLACK);
+        text.setTextColor(0xFF000000);
         text.setGravity(Gravity.CENTER);
 
         item.addView(text);
 
-        // Open app when tapped
-        item.setOnClickListener(v -> {
+        // Open app
+        item.setOnClickListener(
+                new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        try {
+                            startActivity(intent);
+                        } catch (Exception e) {
+                            // App isn't available.
+                        }
+                    }
+                }
+        );
 
-            try {
-
-                startActivity(intent);
-
-            } catch (Exception e) {
-
-                // If the normal app can't be found,
-                // do nothing rather than crashing.
-            }
-        });
-
-        grid.addView(item);
-    }
-
-    private Intent getPhoneIntent() {
-
-        Intent intent =
-                new Intent(Intent.ACTION_DIAL);
-
-        return intent;
-    }
-
-    private Intent getMessagesIntent() {
-
-        Intent intent =
-                new Intent(Intent.ACTION_MAIN);
-
-        intent.addCategory(Intent.CATEGORY_APP_MESSAGING);
-
-        return intent;
-    }
-
-    private Intent getContactsIntent() {
-
-        Intent intent =
-                new Intent(Intent.ACTION_MAIN);
-
-        intent.addCategory(Intent.CATEGORY_APP_CONTACTS);
-
-        return intent;
+        row.addView(item);
     }
 }
